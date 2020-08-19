@@ -3,11 +3,7 @@ const express=require('express')
 const hbs=require('hbs')
 const geocode=require('./utils/geocode.js')
 const forecast=require('./utils/forecast.js')
-
-
-console.log(__dirname)
-
-
+const port = process.env.PORT || 3000
 const app =express()
 //Define path for express config
 const publicDirectoryPath=(path.join(__dirname,'../public'))
@@ -41,28 +37,6 @@ app.get('/help',(req,res)=>{
 
     })
 })                
-
-
-
-// app.get('',(req,res)=>{
-//     res.send('<h1>Hello Express!</h1>')
-// })
-
-// app.get('/help',(req,res)=>{
-//     res.send([{
-//         name:'Kiran',
-//         age:22
-//     },
-//     {
-//         name:'Jagdish',
-//         age:25
-//     }])
-// })
-
-// app.get('/about',(req,res)=>{
-//     res.send('<h1>About</h1>')
-// })
-
 app.get('/products',(req,res)=>{
     if(!req.query.search)
     {
@@ -110,13 +84,6 @@ app.get('/weather',(req,res)=>{
           })
          
     })
-    // res.send(
-    //     {
-    //         location:'India',
-    //         weather:'25 degree',
-    //         address:req.query.address
-    //     }
-    // )
 })
 
 app.get('/help/*',(req,res)=>{
@@ -136,6 +103,6 @@ app.get('*',(req,res)=>{
         errorMessage:'Page not found'
     })
 })
-app.listen(3000,()=>{
-    console.log('Server is up on port 3000')
+app.listen(port,()=>{
+    console.log('Server is up on port ' + port)
 })
