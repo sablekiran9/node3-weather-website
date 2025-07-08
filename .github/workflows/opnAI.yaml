@@ -25,50 +25,45 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          # Escape newlines and quotes for JSON formatting
-          CHANGES=$(jq -Rs '.' < changes.txt)
-
-          PROMPT="Based on the following code changes, generate a concise PR title (max 72 characters) and a detailed description. The title should summarize the main change, and the description should explain what was changed and why. Format your response as JSON with 'title' and 'description' fields.\n\nCode changes:\n$CHANGES"
-
-          # Make Gemini API call
+          # Properly escape diff content into a JSON-safe string using jq
+          CHANGES=$(jq -Rs . < changes.txt)
+      
+          PROMPT="Based on the following code changes, generate a concise PR title (max 72 characters) and a detailed description. The title should summarize the main change, and the description should explain what was changed and why. Format your response as JSON with 'title' and 'description' fields.
+      
+          Code changes:
+          $CHANGES"
+          
+              # Prepare JSON for Gemini API call using jq to ensure proper escaping
+              REQUEST_BODY=$(jq -n --arg prompt "$PROMPT" '{
+                contents: [{
+                  parts: [{
+                    text: $prompt
+                  }]
+                }]
+              }')
+          
+          # Call Gemini API
           RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}" \
             -H "Content-Type: application/json" \
-            -X POST \
-            -d "{
-              \"contents\": [
-                {
-                  \"parts\": [
-                    {
-                      \"text\": \"$PROMPT\"
-                    }
-                  ]
-                }
-              ]
-            }")
-
+            -d "$REQUEST_BODY")
+      
           echo "Gemini Response: $RESPONSE"
-
-          # Extract content text (Gemini returns a stringified JSON response as plain text)
+      
+          # Extract response content
           CONTENT=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text')
-
-          # Parse JSON inside response text
+      
+          # Try to parse JSON inside the string Gemini returned
           TITLE=$(echo "$CONTENT" | jq -r '.title // empty')
           DESCRIPTION=$(echo "$CONTENT" | jq -r '.description // empty')
-
+      
+          # Fallbacks
           if [ -z "$TITLE" ]; then
             TITLE="Auto-generated: Code changes detected"
           fi
           if [ -z "$DESCRIPTION" ]; then
-            DESCRIPTION="### 🔄 PR Updated by Workflow
-
-          This pull request was automatically updated based on code changes detected.
-
-          **Changes detected:**
-          - Code modifications found in the repository
-          - Please review the changes in the Files Changed tab"
+            DESCRIPTION="### 🔄 PR Updated by Workflow"
+      
           fi
-
-          # Set outputs
           echo "title=$TITLE" >> $GITHUB_OUTPUT
           echo "description<<EOF" >> $GITHUB_OUTPUT
           echo "$DESCRIPTION" >> $GITHUB_OUTPUT

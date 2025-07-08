@@ -8,7 +8,7 @@ const geocode=(address,callback)=>{
         }
         else if(body.features.length===0)
         {
-            callback('Unable to find location, Please provide the valid location')
+            callback('Unable to find location, Location is not valid')
         }
         else
         {
