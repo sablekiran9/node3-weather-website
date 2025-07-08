@@ -49,26 +49,37 @@ jobs:
       
           echo "Gemini Response: $RESPONSE"
       
-          # Extract response content
+          # Extract raw Gemini response
           CONTENT=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text')
-      
-          # Try to parse JSON inside the string Gemini returned
-          TITLE=$(echo "$CONTENT" | jq -r '.title // empty')
-          DESCRIPTION=$(echo "$CONTENT" | jq -r '.description // empty')
-      
+          
+          # Clean out Markdown code block formatting
+          CLEANED=$(echo "$CONTENT" \
+            | sed -E 's/^```json//; s/^```//; s/```$//; s/^```//' \
+            | sed '/^$/d')
+          
+          # Try to parse JSON
+          TITLE=$(echo "$CLEANED" | jq -r '.title // empty')
+          DESCRIPTION=$(echo "$CLEANED" | jq -r '.description // empty')
+          
           # Fallbacks
           if [ -z "$TITLE" ]; then
             TITLE="Auto-generated: Code changes detected"
           fi
           if [ -z "$DESCRIPTION" ]; then
-            DESCRIPTION="### 🔄 PR Updated by Workflow"
-      
+            DESCRIPTION="### 🔄 PR Updated by Workflow
+          
+          This pull request was automatically updated based on code changes detected.
+          
+          **Changes detected:**
+          - Code modifications found in the repository
+          - Please review the changes in the Files Changed tab"
           fi
+          
+          # Set outputs
           echo "title=$TITLE" >> $GITHUB_OUTPUT
           echo "description<<EOF" >> $GITHUB_OUTPUT
           echo "$DESCRIPTION" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-
       - name: Update PR Title and Description
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
