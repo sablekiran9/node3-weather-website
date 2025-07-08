@@ -1,0 +1,97 @@
+name: PR Handler Workflow with ChatGPT
+on:
+  pull_request:
+    types: [opened] # Trigger only when PR is created
+
+jobs:
+  handle-pr:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout PR Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # Fetch full history for better diff
+
+    - name: Save PR Changes to File
+      run: |
+        git fetch origin ${{ github.event.pull_request.base.ref }}
+        git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > changes.txt
+        
+    - name: Print Changes File
+      run: cat changes.txt
+
+    - name: Generate PR Title and Description with ChatGPT
+      id: chatgpt
+      run: |
+        # Read the changes file
+        CHANGES=$(cat changes.txt)
+        
+        # Prepare the prompt for ChatGPT
+        PROMPT="Based on the following code changes, generate a concise PR title (max 72 characters) and a detailed description. The title should summarize the main change, and the description should explain what was changed and why. Format your response as JSON with 'title' and 'description' fields.
+
+        Code changes:
+        $CHANGES"
+        
+        # Call ChatGPT API
+        RESPONSE=$(curl -s -X POST "https://api.openai.com/v1/chat/completions" \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
+          -d "{
+            \"model\": \"gpt-3.5-turbo\",
+            \"messages\": [
+              {
+                \"role\": \"system\",
+                \"content\": \"You are a helpful assistant that generates concise and professional PR titles and descriptions based on code changes. Always respond with valid JSON format.\"
+              },
+              {
+                \"role\": \"user\",
+                \"content\": $(echo "$PROMPT" | jq -R -s .)
+              }
+            ],
+            \"max_tokens\": 500,
+            \"temperature\": 0.3
+          }")
+        
+        echo "ChatGPT Response: $RESPONSE"
+        
+        # Extract title and description from response
+        TITLE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content' | jq -r '.title // empty')
+        DESCRIPTION=$(echo "$RESPONSE" | jq -r '.choices[0].message.content' | jq -r '.description // empty')
+        
+        # Fallback if ChatGPT response is empty or invalid
+        if [ -z "$TITLE" ] || [ "$TITLE" = "null" ]; then
+          TITLE="Auto-generated: Code changes detected"
+        fi
+        
+        if [ -z "$DESCRIPTION" ] || [ "$DESCRIPTION" = "null" ]; then
+          DESCRIPTION="### 🔄 PR Updated by Workflow
+          
+          This pull request was automatically updated based on code changes detected.
+          
+          **Changes detected:**
+          - Code modifications found in the repository
+          - Please review the changes in the Files Changed tab"
+        fi
+        
+        # Set outputs for next step
+        echo "title=$TITLE" >> $GITHUB_OUTPUT
+        echo "description<<EOF" >> $GITHUB_OUTPUT
+        echo "$DESCRIPTION" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+    - name: Update PR Title and Description
+      env:
+        GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: |
+        # Use the ChatGPT generated title and description
+        NEW_TITLE="${{ steps.chatgpt.outputs.title }}"
+        NEW_BODY="${{ steps.chatgpt.outputs.description }}"
+        
+        echo "Updating PR with:"
+        echo "Title: $NEW_TITLE"
+        echo "Description: $NEW_BODY"
+        
+        gh pr edit "$PR_NUMBER" --title "$NEW_TITLE" --body "$NEW_BODY"
