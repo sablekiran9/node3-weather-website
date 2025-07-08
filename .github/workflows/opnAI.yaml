@@ -61,11 +61,11 @@ jobs:
           if [ -z "$DESCRIPTION" ]; then
             DESCRIPTION="### 🔄 PR Updated by Workflow
 
-This pull request was automatically updated based on code changes detected.
+          This pull request was automatically updated based on code changes detected.
 
-**Changes detected:**
-- Code modifications found in the repository
-- Please review the changes in the Files Changed tab"
+          **Changes detected:**
+          - Code modifications found in the repository
+          - Please review the changes in the Files Changed tab"
           fi
 
           # Set outputs
