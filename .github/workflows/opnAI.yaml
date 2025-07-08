@@ -33,24 +33,21 @@ jobs:
         $CHANGES"
         
         # Call ChatGPT API
-        RESPONSE=$(curl -s -X POST "https://api.openai.com/v1/chat/completions" \
-          -H "Content-Type: application/json" \
-          -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
-          -d "{
-            \"model\": \"gpt-3.5-turbo\",
-            \"messages\": [
-              {
-                \"role\": \"system\",
-                \"content\": \"You are a helpful assistant that generates concise and professional PR titles and descriptions based on code changes. Always respond with valid JSON format.\"
-              },
-              {
-                \"role\": \"user\",
-                \"content\": $(echo "$PROMPT" | jq -R -s .)
-              }
-            ],
-            \"max_tokens\": 500,
-            \"temperature\": 0.3
-          }")
+        RESPONSE=$(curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent" \
+          -H 'Content-Type: application/json' \
+          -H 'X-goog-api-key: ${{ secrets.GEMINI_API_KEY }}' \
+          -X POST \
+          -d '{
+             "contents": [
+                          {
+                           "parts": [
+                                     {
+                                      "text": "Explain how AI works in a few words"
+                                     }
+                                    ]
+                         }
+                       ]
+               }')
         
         echo "ChatGPT Response: $RESPONSE"
         
